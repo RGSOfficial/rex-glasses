@@ -99,7 +99,7 @@
 
   <div class="container">
     <div class="header">
-      <div class="title-group"><h1>Rex</h1></div>
+      <div class="title-group"><h1>Rex Glasses v1.0.6</h1></div>
       <div id="statusPill" class="status-pill">Idle</div>
     </div>
 
@@ -200,24 +200,17 @@
         processSpeechInput(transcript);
       };
 
+      // Automatically restart listening when recognition ends naturally
       recognition.onend = () => {
         if (isListening && !isProcessing) {
-          updateStatus("", "Idle");
-          const btn = document.getElementById("toggleBtn");
-          btn.innerText = "Start Listening";
-          btn.style.background = "var(--accent-blue)";
-          isListening = false;
+          try { recognition.start(); } catch(e){}
         }
       };
 
       recognition.onerror = (err) => {
-        console.error("Speech recognition error:", err.error);
-        isProcessing = false;
-        isListening = false;
-        updateStatus("", "Idle");
-        const btn = document.getElementById("toggleBtn");
-        btn.innerText = "Start Listening";
-        btn.style.background = "var(--accent-blue)";
+        if (err.error !== "no-speech" && isListening && !isProcessing) {
+          setTimeout(() => { try { recognition.start(); } catch(e){} }, 300);
+        }
       };
     }
 
@@ -231,19 +224,16 @@
       const btn = document.getElementById("toggleBtn");
       
       if (!isListening) {
+        // Unlock browser audio context on user click
         const unlockAudio = new Audio();
         unlockAudio.play().catch(() => {});
 
         await bindMicrophoneStream();
-        try { 
-          recognition.start(); 
-          isListening = true;
-          btn.innerText = "Stop Listening";
-          btn.style.background = "#dc2626";
-          updateStatus("listening", "Listening");
-        } catch(e) {
-          console.error("Start failed:", e);
-        }
+        try { recognition.start(); } catch(e){}
+        isListening = true;
+        btn.innerText = "Stop Listening";
+        btn.style.background = "#dc2626";
+        updateStatus("listening", "Listening");
       } else {
         isListening = false;
         try { recognition.stop(); } catch(e){}
@@ -308,14 +298,16 @@
         const audio = new Audio(audioUrl);
         audio.playbackRate = SPEECH_PLAYBACK_RATE;
 
+        // Automatically resume listening after Rex finishes speaking
         audio.onended = () => {
           URL.revokeObjectURL(audioUrl);
           isProcessing = false;
-          updateStatus("", "Idle");
-          const btn = document.getElementById("toggleBtn");
-          btn.innerText = "Start Listening";
-          btn.style.background = "var(--accent-blue)";
-          isListening = false;
+          if (isListening) {
+            updateStatus("listening", "Listening");
+            try { recognition.start(); } catch(e){}
+          } else {
+            updateStatus("", "Idle");
+          }
         };
 
         await audio.play();
@@ -324,11 +316,10 @@
         console.error("Pipeline Error:", error);
         document.getElementById("rexResponse").innerText = "Error: " + error.message;
         isProcessing = false;
-        isListening = false;
-        updateStatus("", "Idle");
-        const btn = document.getElementById("toggleBtn");
-        btn.innerText = "Start Listening";
-        btn.style.background = "var(--accent-blue)";
+        if (isListening) {
+          updateStatus("listening", "Listening");
+          try { recognition.start(); } catch(e){}
+        }
       }
     }
 
