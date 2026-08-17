@@ -102,7 +102,7 @@
 
   <div class="container">
     <div class="header">
-      <div class="title-group"><h1>Rex Glasses v1.0.7</h1></div>
+      <div class="title-group"><h1>Rex Glasses v1.0.8</h1></div>
       <div id="statusPill" class="status-pill">Idle</div>
     </div>
 
@@ -140,6 +140,11 @@
     let isListening = false;
     let isProcessing = false;
     let activeMediaStream = null;
+
+    // Conversation history array storing context across turns
+    let chatHistory = [
+      { role: "system", content: "You are Rex, a helpful AI assistant. Keep responses brief, clear, and conversational for speech output. Do NOT use emojis, special symbols, or markdown." }
+    ];
 
     const micSelect = document.getElementById("micSelect");
 
@@ -260,6 +265,9 @@
       updateStatus("thinking", "Thinking");
 
       try {
+        // Push user prompt into conversation history
+        chatHistory.push({ role: "user", content: queryText });
+
         const llmResponse = await fetch(NGROK_LLM_URL, {
           method: "POST",
           headers: { 
@@ -268,16 +276,16 @@
           },
           body: JSON.stringify({
             model: MODEL_NAME,
-            messages: [
-              { role: "system", content: "You are Rex, a helpful AI assistant. Keep responses brief, clear, and conversational for speech output. Do NOT use emojis, special symbols, or markdown." },
-              { role: "user", content: queryText }
-            ]
+            messages: chatHistory
           })
         });
 
         if (!llmResponse.ok) throw new Error("LLM backend error.");
         const llmData = await llmResponse.json();
         const rexReply = llmData.choices[0].message.content;
+
+        // Push assistant response into conversation history so context is kept for next turn
+        chatHistory.push({ role: "assistant", content: rexReply });
 
         document.getElementById("rexResponse").innerText = rexReply;
         document.getElementById("rexResponse").style.color = "var(--text-main)";
